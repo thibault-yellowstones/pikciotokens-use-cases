@@ -3,7 +3,7 @@ from pikciotok import context
 import loyalty_card
 
 
-def main():
+def test_loyalty_card():
     # Let's create Luigi's loyalty card...
     loyalty_card.init(
         _name="Luigi's Pizzeria",
@@ -29,16 +29,17 @@ def main():
     try:
         context.sender = 'john.doe@mymail.com'
         loyalty_card.purchase('Free Pizza')
-    except ValueError:
-        print('John Failed to purchase the free pizza')
+    except ValueError as e:
+        print('John Failed to purchase the free pizza: ' + str(e))
 
     # However he can have the dessert
     # This should fire an JSON event in the console.
     loyalty_card.purchase('Free Dessert')
 
     # Obviously, Mr Doe balance has been decreased.
-    print("Remaining: " + str(loyalty_card.get_balance('john.doe@mymail.com')))
+    new_balance = loyalty_card.get_balance('john.doe@mymail.com')
+    print("Doe's balance: " + str(new_balance))
 
 
 if __name__ == '__main__':
-    main()
+    test_loyalty_card()
