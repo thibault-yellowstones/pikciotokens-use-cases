@@ -6,8 +6,8 @@ import loyalty_card
 def test_loyalty_card():
     # Let's create Luigi's loyalty card...
     loyalty_card.init(
-        _name="Luigi's Pizzeria",
-        _symbol="PIZZ"
+        name_="Luigi's Pizzeria",
+        symbol_="PIZZ"
     )
 
     # And add a few gifts to the catalog.
@@ -18,10 +18,10 @@ def test_loyalty_card():
     })
 
     # Say Mr Doe bought a 3 course meal. He won some points.
-    loyalty_card.grant('john.doe@mymail.com', 300)
+    loyalty_card.grant('john.doe@mymail.com', 350)
 
     # Mrs Bourgon get some points because of a current promotion in the menu.
-    loyalty_card.grant('alice.Bourgon@mymail.com', 200)
+    loyalty_card.grant('alice.bourgon@mymail.com', 220)
 
     print("Total points ever granted: {}.".format(loyalty_card.total_supply))
 
@@ -39,6 +39,13 @@ def test_loyalty_card():
     # Obviously, Mr Doe balance has been decreased.
     new_balance = loyalty_card.get_balance('john.doe@mymail.com')
     print("Doe's balance: " + str(new_balance))
+
+    # Alice can have the free drink.
+    context.sender = 'alice.bourgon@mymail.com'
+    loyalty_card.purchase('Free Drink')
+
+    # We can track how many points have been spent.
+    print('Total spent by everyone: {}'.format(loyalty_card.get_total_spent()))
 
 
 if __name__ == '__main__':

@@ -5,6 +5,7 @@ from pikciotok import base, context, events
 _TOKEN_VERSION = "T1.0"
 
 # Standard attributes
+
 name = ''
 symbol = ''
 decimals = 0  # No decimals. Points can't be divided.
@@ -12,7 +13,13 @@ initial_supply = 0  # No initial supply. Points are created on the fly.
 total_supply = 0
 balance_of = {}
 
+base.missing_balance_means_zero = False
+"""We do not want to delete accounts of customers who have spent all of their 
+points. So let's prevent that auto-removal by clearly stating that an empty 
+account is not equal to a missing one."""
+
 # Special attributes
+
 bank_account = ''
 """The 'bank' account, getting the points when a client spends them.
 This is an easy to check how many points have been spent.
@@ -29,11 +36,11 @@ purchased = events.register("purchased", "gift", "by", "price")
 """The only event we are interested in is the purchase of a gift."""
 
 
-def init(_name: str, _symbol: str):
+def init(name_: str, symbol_: str):
     """Initialise this token with a new name, and symbol."""
     global name, symbol, bank_account
-    name = _name
-    symbol = _symbol
+    name = name_
+    symbol = symbol_
 
     # It is assumed that the token initiator is "the bank".
     bank_account = context.sender
@@ -72,6 +79,7 @@ def remove_from_catalog(gift_names: List[str]) -> int:
 
 
 # Global accessors
+
 def get_total_spent() -> int:
     """Gives the total number of points spent by all customers."""
     return base.Balances(balance_of).get(bank_account)
