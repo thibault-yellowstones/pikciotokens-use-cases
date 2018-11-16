@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import List, Dict, Tuple
 
 from pikciotok import base, context, events
 
@@ -8,31 +8,39 @@ _TOKEN_VERSION = "T1.0"
 
 name = ''
 symbol = ''
-decimals = 0  # No decimals. Points can't be divided.
+decimals = 0  # No decimals. A ballot cannot be divided.
 total_supply = 0
-balance_of = {}
-
-base.missing_balance_means_zero = False
-"""We do not want to delete accounts of customers who have spent all of their 
-points. So let's prevent that auto-removal by clearly stating that an empty 
-account is not equal to a missing one."""
 
 # Special attributes
 
-bank_account = ''
-"""The 'bank' account, getting the points when a client spends them.
-This is an easy to check how many points have been spent.
-"""
-gift_catalog = {}
-# type: Dict[str, int]
-"""Contains a mapping of all the gifts that can be purchased using the loyalty 
-points. Each name is mapped to a price. The case is simplified as we assume 
-there is no limit on the quantity per gift.
+balance_of_yes = {}
+# type: Dict[str,int]
+balance_of_no = {}
+# type: Dict[str,int]
+"""balance_of_yes and balance_of_no give for each citizen the number of "Yes" 
+and "No" they own. Typically, this will be:
+- (0, 0) if the poll has not started.
+- (1, 1) if the poll has started and the citizen has not voted yet.
+- (1, 0) or (0, 1) if the citizen has voted.
+- (X, Y) for the vote place, that is the account collecting votes.
 """
 
+base.missing_balance_means_zero = False
+"""To enter the poll, you must have """
+
+# Special attributes
+
+vote_place = ''
+"""The 'vote place' account, collecting the yes and no hen people vote."""
+
+question = ''
+"""The question currently being asked to the citizens."""
+
 # Events
-purchased = events.register("purchased", "gift", "by", "price")
-"""The only event we are interested in is the purchase of a gift."""
+started = events.register("citizens_count", "question")
+completed = events.register("completed", "reason", "votes", "yes_rate",
+                            "no_rate")
+voted = events.register("vote", "participation", "remaining_votes")
 
 
 def init(name_: str, symbol_: str):

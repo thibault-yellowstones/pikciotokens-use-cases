@@ -9,6 +9,7 @@ _TOKEN_VERSION = "T1.0"
 name = ''
 symbol = ''
 decimals = 0  # No decimals. Points can't be divided.
+initial_supply = 0  # No initial supply. Points are created on the fly.
 total_supply = 0
 balance_of = {}
 
