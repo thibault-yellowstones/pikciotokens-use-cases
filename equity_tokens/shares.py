@@ -156,7 +156,7 @@ def get_dividend() -> float:
     return dividend
 
 
-def get_total_shares() -> int:
+def get_total_supply() -> int:
     """Gives the total number of shares."""
     return total_supply
 
