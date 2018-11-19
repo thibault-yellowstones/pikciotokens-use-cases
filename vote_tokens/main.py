@@ -1,52 +1,56 @@
+from random import Random
+
 from pikciotok import context
 
-import loyalty_card
+import vote
 
 
-def test_loyalty_card():
-    # Let's create Luigi's loyalty card...
-    loyalty_card.init(
-        name_="Luigi's Pizzeria",
-        symbol_="PIZZ"
+def test_vote():
+    # Let's create a new vote...
+    voters_count = 10000
+    context.sender = 'vote place'
+    vote.init(
+        name_="What is the best way to eat strawberries?",
+        symbol_="STBY",
+        total_supply_=voters_count
     )
+    print("Today's question is: {}".format(vote.name))
 
-    # And add a few gifts to the catalog.
-    loyalty_card.add_update_catalog({
-        'Free Drink': 200,
-        'Free Dessert': 300,
-        'Free Pizza': 400,
-    })
+    # Add a few options...
+    candidates = (
+        "Raw. Best is natural.",
+        "With Yogurt and sugar.",
+        "In a tart, with a scoop of ice cream.",
+        "As jam on a toast."
+    )
+    for candidate in candidates:
+        vote.add_candidate(candidate)
+    print("Candidates are:\n{}\n".format('\n'.join(candidates)))
 
-    # Say Mr Doe bought a 3 course meal. He won some points.
-    loyalty_card.grant('john.doe@mymail.com', 350)
+    # And loads of voters.
+    for i in range(voters_count):
+        vote.register_voter(str(i))
+    print("There are {} voters.".format(vote.get_voters_count()))
 
-    # Mrs Bourgon get some points because of a current promotion in the menu.
-    loyalty_card.grant('alice.bourgon@mymail.com', 220)
+    # Start the vote.
+    vote.start()
+    rand = Random()
 
-    print("Total points ever granted: {}.".format(loyalty_card.total_supply))
+    # Each voter may now hav an opinion.
+    for i in range(voters_count):
+        # About 70% of the population cares to answer.
+        if rand.randint(0, 9) > 2:
+            context.sender = str(i)
+            vote.vote(rand.choice(candidates))
 
-    # If Mr Doe tries to get the free pizza, it won't work.
-    try:
-        context.sender = 'john.doe@mymail.com'
-        loyalty_card.purchase('Free Pizza')
-    except ValueError as e:
-        print('John Failed to purchase the free pizza: ' + str(e))
+    # Time to stop the poll and collect results.
+    context.sender = 'vote place'
+    vote.interrupt()
 
-    # However he can have the dessert
-    # This should fire an JSON event in the console.
-    loyalty_card.purchase('Free Dessert')
-
-    # Obviously, Mr Doe balance has been decreased.
-    new_balance = loyalty_card.get_balance('john.doe@mymail.com')
-    print("Doe's balance: " + str(new_balance))
-
-    # Alice can have the free drink.
-    context.sender = 'alice.bourgon@mymail.com'
-    loyalty_card.purchase('Free Drink')
-
-    # We can track how many points have been spent.
-    print('Total spent by everyone: {}'.format(loyalty_card.get_total_spent()))
+    print('Duration was: ' + str(vote.get_vote_duration()))
+    print('Participation was: {:.2f}%'.format(vote.get_participation() * 100))
+    print('Winner was: ' + vote.get_winner())
 
 
 if __name__ == '__main__':
-    test_loyalty_card()
+    test_vote()

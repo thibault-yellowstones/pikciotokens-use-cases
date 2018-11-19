@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Dict, Set, List
+from typing import Dict, List
 
 from pikciotok import base, context, events
 
@@ -36,8 +36,8 @@ between having no balance and not being a voter."""
 vote_place = ''
 """The referee of the vote. Dispatches ballots when the vote begins."""
 
-candidates = set()
-# type: Set[str]
+candidates = []
+# type: List[str]
 """The addresses of the candidates in the vote. This set must be defined when 
 a vote starts."""
 
@@ -69,7 +69,6 @@ def init(name_: str, symbol_: str, total_supply_):
     symbol = symbol_
     total_supply = total_supply_
 
-    # Clear the state.
     vote_place = context.sender  # The token creator becomes the referee.
     balance_of[vote_place] = total_supply
 
@@ -86,7 +85,7 @@ def get_voters_count() -> int:
     return len(balance_of) - len(candidates) - 1  # Remove the vote place.
 
 
-def get_candidates() -> Set[str]:
+def get_candidates() -> List[str]:
     """Obtains the addresses of the current poll candidates."""
     return candidates
 
@@ -101,12 +100,12 @@ def is_vote_in_progress() -> bool:
     return vote_beginning > 0
 
 
-def current_vote_beginning() -> int:
+def current_vote_beginning() -> float:
     """Returns the timestamp of the beginning of the current vote, if any."""
     return vote_beginning
 
 
-def current_vote_end() -> int:
+def current_vote_end() -> float:
     """Returns the timestamp of the end of the current vote, if any."""
     return vote_end
 
@@ -140,20 +139,26 @@ def _assert_no_vote_started():
 def _assert_vote_not_stopped():
     """Raises an exception if a vote has already been stopped."""
     if vote_stop_reason > 0:
-        raise RuntimeError('Current vote has already been stopped.')
+        raise RuntimeError('Current vote has already been stopped')
 
 
 def _assert_vote_stopped():
     """Raises an exception if a vote has not already been stopped."""
     if vote_stop_reason == 0:
-        raise RuntimeError('Current vote has not been stopped yet.')
+        raise RuntimeError('Current vote has not been stopped yet')
 
 
-def _assert_is_candidate(address):
+def _assert_is_candidate(address: str):
     """Raises an exception if provided address does not belong to a
     candidate."""
     if address not in candidates:
-        raise ValueError("'{}' is not a candidate.".format(address))
+        raise ValueError("'{}' is not a candidate".format(address))
+
+
+def _assert_is_vote_place(address: str):
+    """Raises an exception if provided address is not the vote place"""
+    if address != vote_place or not vote_place:
+        raise ValueError("'{} is not the vote place".format(address))
 
 
 def register_voter(address: str) -> int:
@@ -173,7 +178,8 @@ def strike_off_voter(address: str) -> int:
     :returns: The new count of voters.
     """
     _assert_no_vote_started()
-    del balance_of[address]
+    if address in balance_of:
+        del balance_of[address]
     return get_voters_count()
 
 
@@ -183,7 +189,10 @@ def add_candidate(address: str) -> int:
     :returns: The new count of candidates.
     """
     _assert_no_vote_started()
-    candidates.add(address)
+
+    _assert_electoral_list_is_not_full()
+    balance_of[address] = 0
+    candidates.append(address)
     return get_candidates_count()
 
 
@@ -193,6 +202,9 @@ def remove_candidate(address: str) -> int:
     :returns: The new count of candidates.
     """
     _assert_no_vote_started()
+    _assert_is_candidate(address)
+    _assert_electoral_list_is_not_full()
+    del balance_of[address]
     candidates.remove(address)
     return get_candidates_count()
 
@@ -219,9 +231,9 @@ def interrupt() -> str:
     :returns: The address of the winner.
     """
     global vote_stop_reason, vote_end
-
     _assert_vote_started()
     _assert_vote_not_stopped()
+    _assert_is_vote_place(context.sender)
 
     vote_stop_reason = _VOTE_STOP_INTERRUPTED
     vote_end = datetime.utcnow().timestamp()
@@ -241,7 +253,7 @@ def clear() -> bool:
     vote_beginning = 0
     vote_end = 0
     vote_stop_reason = _VOTE_STOP_NOT_YET
-    candidates = set()
+    candidates = []
 
     for address in balance_of:
         balance_of[address] = 0
@@ -250,7 +262,7 @@ def clear() -> bool:
     return True
 
 
-def vote(address) -> bool:
+def vote(address: str) -> bool:
     """Puts a ballot in provided candidate urn."""
     global vote_stop_reason, vote_end
 
@@ -264,6 +276,7 @@ def vote(address) -> bool:
     voted(participation=get_participation(),
           remaining_votes=get_remaining_votes())
 
+    # Check for vote termination
     if get_remaining_votes() == 0:
         vote_stop_reason = _VOTE_STOP_COMPLETED
         vote_end = datetime.utcnow().timestamp()
@@ -274,11 +287,13 @@ def vote(address) -> bool:
 # Token supply management
 
 def mint(amount: int) -> int:
-    """Request money creation and add created amount to sender balance.
+    """Request ballot creation and add created amount to sender balance.
     Returns new total supply.
     """
     global total_supply
+
     _assert_no_vote_started()
+    _assert_is_vote_place(context.sender)
 
     new_supply = base.mint(balance_of, total_supply, context.sender, amount)
     if new_supply != total_supply:
@@ -289,11 +304,12 @@ def mint(amount: int) -> int:
 
 
 def burn(amount: int) -> int:
-    """Destroy money. Money is withdrawn from sender's account.
+    """Destroy ballot. ballots are withdrawn from sender's account.
     Returns new total supply.
     """
     global total_supply
     _assert_no_vote_started()
+    _assert_is_vote_place(context.sender)
 
     new_supply = base.burn(balance_of, total_supply, context.sender, amount)
     if new_supply != total_supply:
@@ -316,22 +332,33 @@ def get_participation() -> float:
     return 1 - (get_remaining_votes() / get_voters_count())
 
 
-def get_vote_duration() -> int:
+def get_vote_duration() -> float:
+    """Obtains the duration of the vote until now. The duration keeps
+    increasing until the vote is stopped somehow.
+    """
     _assert_vote_started()
-    return vote_end - vote_beginning
+    end = vote_end or datetime.utcnow().timestamp()
+    return end - vote_beginning
 
 
-def get_score(candidate) -> int:
+def get_score(candidate: str) -> float:
+    """Obtains the vote percentage for the provided candidate. Such result can
+    only be queried once the vote has stopped.
+    """
     _assert_vote_stopped()
     _assert_is_candidate(candidate)
     return balance_of[candidate] / get_voters_count()
 
 
 def get_ranking() -> List[str]:
+    """Obtains the complete ranking of all the candidates, by decreasing score
+    order. Such result can only be queried once the vote has stopped.
+    """
     _assert_vote_stopped()
     return list(sorted(candidates, reverse=True, key=lambda c: get_score(c)))
 
 
 def get_winner() -> str:
+    """Obtains the address of the winning candidate."""
     ranking = get_ranking()
     return ranking[0] if ranking else ''
