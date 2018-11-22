@@ -35,11 +35,12 @@ purchased = events.register("purchased", "gift", "by", "price")
 """The only event we are interested in is the purchase of a gift."""
 
 
-def init(name_: str, symbol_: str):
-    """Initialise this token with a new name, and symbol."""
-    global name, symbol, bank_account
+def init(name_: str, symbol_: str, total_supply_: int):
+    """Initialise this token with a new name, supply and symbol."""
+    global name, symbol, bank_account, total_supply
     name = name_
     symbol = symbol_
+    total_supply = total_supply_ * 10 ** decimals
 
     # It is assumed that the token initiator is "the bank".
     bank_account = context.sender

@@ -71,12 +71,12 @@ transferred = events.register("transfer", "sender", "recipient", "amount")
 """Fired when a shareholder transfer shares to another shareholder."""
 
 
-def init(name_: str, symbol_: str, supply: int):
+def init(name_: str, symbol_: str, total_supply_: int):
     """Initialise this token with a new name, symbol and vote mode."""
     global name, symbol, vote_mode, total_supply
     name = name_
     symbol = symbol_
-    total_supply = supply * 10 ** decimals
+    total_supply = total_supply_ * 10 ** decimals
     balance_of[context.sender] = total_supply
 
 
@@ -86,7 +86,7 @@ def transfer(to_address: str, amount: int) -> bool:
     """Execute a transfer of shares from the sender to another shareholder."""
     sender = context.sender
     if base.transfer(balance_of, sender, to_address, amount):
-        transferred(sender=sender, recipient=total_supply, amount=amount)
+        transferred(sender=sender, recipient=to_address, amount=amount)
         return True
     return False
 
@@ -159,6 +159,15 @@ def get_dividend() -> float:
 def get_total_supply() -> int:
     """Gives the total number of shares."""
     return total_supply
+
+
+def get_balance(address: str) -> int:
+    """Gives the current balance of the specified user.
+
+    Similar to get_organic_shares, but does not raise an exception if address
+    is not a shareholder.
+    """
+    return base.Balances(balance_of).get(address)
 
 
 # Shares related info

@@ -9,7 +9,7 @@ def test_shares():
     shares.init(
         name_="Pikciotronics Ltd",
         symbol_="PKT",
-        supply=13000000
+        total_supply_=13000000
     )
 
     # Add another shareholder

@@ -67,7 +67,7 @@ def init(name_: str, symbol_: str, total_supply_):
     global name, symbol, total_supply, vote_place
     name = name_
     symbol = symbol_
-    total_supply = total_supply_
+    total_supply = total_supply_ * 10 ** decimals
 
     vote_place = context.sender  # The token creator becomes the referee.
     balance_of[vote_place] = total_supply
@@ -286,6 +286,11 @@ def vote(address: str) -> bool:
 
 # Token supply management
 
+def get_balance(address: str) -> int:
+    """Gives the current balance of the specified user"""
+    return base.Balances(balance_of).get(address)
+
+
 def mint(amount: int) -> int:
     """Request ballot creation and add created amount to sender balance.
     Returns new total supply.
@@ -320,6 +325,11 @@ def burn(amount: int) -> int:
 
 
 # Poll info
+
+def has_voted(address: str) -> bool:
+    """Tells if voter has already made his mind."""
+    return get_balance(address) > 0
+
 
 def get_remaining_votes() -> int:
     """Obtains the number of voters who haven't made their mind yet."""
