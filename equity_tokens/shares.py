@@ -1,9 +1,30 @@
 import itertools
-from typing import List, Dict, Tuple
+from typing import List, Tuple
 
-from pikciotok import base, context, events
+from pikciotok import base, context
+
+# T1 Protocol
 
 _TOKEN_VERSION = "T1.0"
+
+
+name = ''
+"""The friendly name of the token"""
+symbol = ''
+"""The symbol of the token currency. Should be 3 or 4 characters long."""
+_decimals = base.MAX_TOKEN_DECIMALS
+"""Maximum number of decimals to express any amount of that token."""
+total_supply = 0
+"""The current amount of the token on the market, in case some has been minted 
+or burnt."""
+balance_of = {}
+# type: dict
+"""Maps customers addresses to their current balance."""
+allowances = {}
+# type: dict
+"""Gives for each customer a map to the amount delegates are allowed to spend 
+on their behalf."""
+
 
 # Internal constants
 
@@ -14,7 +35,7 @@ total assets."""
 _VOTE_POLICY_OPOV = 2
 """One person one vote. Each shareholder weighs the same."""
 
-# Following gives the rights of minority shareholders dependending on their
+# Following gives the rights of minority shareholders depending on their
 # weight.
 _SHAREHOLDERS_RIGHTS = {
     0.05: [
@@ -41,14 +62,6 @@ _SHAREHOLDERS_RIGHTS = {
     ]
 }
 
-# Standard attributes
-
-name = ''
-symbol = ''
-decimals = 3
-total_supply = 0
-balance_of = {}
-
 base.missing_balance_means_zero = True
 """Once you give up your shares, you are no longer a shareholder (and are not
 entitled to receive delegation, to vote, etc...) That means that we want to
@@ -62,81 +75,114 @@ dividend = 0.0
 vote_mode = _VOTE_POLICY_ODOV
 """Specifies how a shareholder weighs in an assembly vote."""
 
-delegations = {}
-# type: Dict[str,str]
-"""Gives for a shareholder an other shareholder who holds its voting power."""
 
-# Events
-transferred = events.register("transfer", "sender", "recipient", "amount")
-"""Fired when a shareholder transfer shares to another shareholder."""
+# Initializer
 
+def init(supply: int, name_: str, symbol_: str):
+    """Initialise this token with a new name, symbol and supply."""
+    global total_supply, name, symbol
 
-def init(name_: str, symbol_: str, total_supply_: int):
-    """Initialise this token with a new name, symbol and vote mode."""
-    global name, symbol, vote_mode, total_supply
-    name = name_
-    symbol = symbol_
-    total_supply = total_supply_ * 10 ** decimals
-    balance_of[context.sender] = total_supply
+    name, symbol = name_, symbol_
+    balance_of[context.sender] = total_supply = (supply * 10 ** _decimals)
 
 
-# Currency and rights transfers
+# Properties
+
+def get_name() -> str:
+    """Gets token name."""
+    return name
+
+
+def get_symbol() -> str:
+    """Gets token symbol."""
+    return symbol
+
+
+def get_decimals() -> int:
+    """Gets the number of decimals of the token."""
+    return _decimals
+
+
+def get_total_supply() -> int:
+    """Returns the current total supply for the token"""
+    return total_supply
+
+
+# Actions
 
 def transfer(to_address: str, amount: int) -> bool:
-    """Execute a transfer of shares from the sender to another shareholder."""
-    sender = context.sender
-    if base.transfer(balance_of, sender, to_address, amount):
-        transferred(sender=sender, recipient=to_address, amount=amount)
-        return True
-    return False
+    """Execute a transfer from the sender to the specified address."""
+    return base.transfer(balance_of, context.sender, to_address, amount)
 
 
-def set_delegate(to_address: str) -> str:
-    """Allow specified address to vote in lieu of the sender.
-
-    :return: The previous delegation or empty string if none
+def mint(amount: int) -> int:
+    """Request tokens creation and add created amount to sender balance.
+    Returns new total supply.
     """
-    if not to_address:
-        raise ValueError('Delegate address cannot be falsy while granting '
-                         'delegation.')
-    previous_delegate = get_delegate()
-    delegations[context.sender] = to_address
-    return previous_delegate
+    global total_supply
+    total_supply = base.mint(balance_of, total_supply, context.sender, amount)
+    return total_supply
 
 
-def remove_delegate() -> str:
-    """Removes the delegation of the current user.
-
-    :return: The previous delegation or empty string if none
+def burn(amount: int) -> int:
+    """Destroy tokens. Tokens are withdrawn from sender's account.
+    Returns new total supply.
     """
-    previous_delegate = get_delegate()
-    if previous_delegate:
-        del delegations[context.sender]
-    return previous_delegate
+    global total_supply
+    total_supply = base.burn(balance_of, total_supply, context.sender, amount)
+    return total_supply
 
 
-def get_delegate(address: str = None) -> str:
-    """Obtains the current delegate of the provided shareholder.
+def approve(to_address: str, amount: int) -> bool:
+    """Allow specified address to spend/use some tokens from sender account.
 
-    :param address: The address of the shareholder to get delegation. If none
-        provided, returns the sender's delegate address.
-
-    :return: The address of the delegate, or empty string if none.
+    The approval is set to specified amount.
     """
-    return delegations.get(address or context.sender, '')
+    return base.approve(allowances, context.sender, to_address, amount)
+
+
+def update_approve(to_address: str, delta_amount: int) -> int:
+    """Updates the amount specified address is allowed to spend/use from
+    sender account.
+
+    The approval is incremented of the specified amount. Negative amounts
+    decrease the approval.
+    """
+    return base.update_approve(allowances, context.sender, to_address,
+                               delta_amount)
+
+
+def transfer_from(from_address: str, to_address: str, amount: int) -> bool:
+    """Executes a transfer on behalf of another address to specified recipient.
+
+    Operation is only allowed if sender has sufficient allowance on the source
+    account.
+    """
+    return base.transfer_from(balance_of, allowances, context.sender,
+                              from_address, to_address, amount)
+
+
+def get_balance(address: str) -> int:
+    """Gives the current balance of the specified account."""
+    return base.Balances(balance_of).get(address)
+
+
+def get_allowance(allowed_address: str, on_address: str) -> int:
+    """Gives the current allowance of allowed_address on on_address account."""
+    return base.Allowances(allowances).get_one(on_address, allowed_address)
 
 
 # Global accessors
 
-def set_vote_mode(vmode: int) -> int:
+def set_vote_mode(mode: int) -> int:
     """Changes the way shareholders weigh in a vote. See _VOTE_POLICY consts.
 
-    :param vmode: The new vote mode.
+    :param mode: The new vote mode.
     :return: The old mode.
     """
     global vote_mode
-    vote_mode, vmode = vmode, vote_mode
-    return vmode
+    vote_mode, mode = mode, vote_mode
+    return mode
 
 
 def get_vote_mode() -> int:
@@ -154,20 +200,6 @@ def set_dividend(dividend_: float) -> float:
 def get_dividend() -> float:
     """Tells what is the current dividend rate."""
     return dividend
-
-
-def get_total_supply() -> int:
-    """Gives the total number of shares."""
-    return total_supply
-
-
-def get_balance(address: str) -> int:
-    """Gives the current balance of the specified user.
-
-    Similar to get_organic_shares, but does not raise an exception if address
-    is not a shareholder.
-    """
-    return base.Balances(balance_of).get(address)
 
 
 # Shares related info
@@ -208,7 +240,8 @@ def is_delegating(address: str = None) -> bool:
         If none provided, uses the sender's delegate address.
     :return: True if the address is currently delegating its share power.
     """
-    return bool(get_delegate(address))
+    _assert_is_shareholder(address)
+    return base.Allowances(allowances).has_allowances(address)
 
 
 def get_delegators(address: str = None) -> Tuple:
@@ -221,7 +254,11 @@ def get_delegators(address: str = None) -> Tuple:
         address.
     """
     _assert_is_shareholder(address)
-    return tuple(addr for addr in delegations if delegations[addr] == address)
+    allowances_ex = base.Allowances(allowances)
+    return tuple(
+        account for account in balance_of
+        if allowances_ex.is_allowed(account, address)
+    )
 
 
 def get_organic_shares(address: str = None) -> int:

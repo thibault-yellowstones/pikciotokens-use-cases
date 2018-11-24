@@ -1,21 +1,24 @@
-from typing import Dict
-
 from pikciotok import base, context, events
 
 _TOKEN_VERSION = "T1.0"
 
-# Standard attributes
-
 name = ''
+"""The friendly name of the token"""
 symbol = ''
-decimals = 0  # No decimals. Permissions cannot be divided.
+"""The symbol of the token currency. Should be 3 or 4 characters long."""
+_decimals = 0  # A permission cannot be split.
+"""Maximum number of decimals to express any amount of that token."""
 total_supply = 0
+"""The current amount of the token on the market, in case some has been minted 
+or burnt."""
 balance_of = {}
-# type: Dict[str,int]
+# type: dict
+"""Maps customers addresses to their current balance."""
 allowances = {}
-# type: Dict[str,Dict[str,int]]
+# type: dict
 """Gives for each customer a map to the amount delegates are allowed to spend 
 on their behalf."""
+
 
 base.missing_balance_means_zero = True
 """Someone who has no token has no permission. Thus having no account is 
@@ -58,31 +61,109 @@ is_frozen = False
 """If True, all permissions are frozen and no one can access."""
 
 # Events
-allowed = events.register("allowed", "user", "amount")
-"""Fired when the authority transfers tokens to an user."""
 revoked = events.register("revoked", "user", "amount")
 """Fired when the authority transfers back some token from an user."""
 access_granted = events.register("access_granted", "user")
 """Fired when the authority reckons that an user is allowed access."""
 access_denied = events.register("access_denied", "user", "why")
 """Fired when the authority states that an user can't access"""
-transferred = events.register("transferred", "sender", "recipient", "amount")
-"""Fired when an user transfers tokens to another user."""
-burnt = events.register("burn", "sender", "amount", "new_supply")
-"""Fired when the authority destroyed some tokens."""
-minted = events.register("mint", "sender", "amount", "new_supply")
-"""Fired when the authority created some tokens."""
 
 
-def init(name_: str, symbol_: str, total_supply_):
+# Properties
+
+def get_name() -> str:
+    """Gets token name."""
+    return name
+
+
+def get_symbol() -> str:
+    """Gets token symbol."""
+    return symbol
+
+
+def get_decimals() -> int:
+    """Gets the number of decimals of the token."""
+    return _decimals
+
+
+def get_total_supply() -> int:
+    """Returns the current total supply for the token"""
+    return total_supply
+
+
+def get_balance(address: str) -> int:
+    """Gives the current balance of the specified account."""
+    return base.Balances(balance_of).get(address)
+
+
+def get_allowance(allowed_address: str, on_address: str) -> int:
+    """Gives the current allowance of allowed_address on on_address account."""
+    return base.Allowances(allowances).get_one(on_address, allowed_address)
+
+
+# Actions
+
+def transfer(to_address: str, amount: int) -> bool:
+    """Execute a transfer from the sender to the specified address."""
+    return base.transfer(balance_of, context.sender, to_address, amount)
+
+
+def mint(amount: int) -> int:
+    """Request tokens creation and add created amount to sender balance.
+    Returns new total supply.
+    """
+    global total_supply
+    _assert_is_authority(context.sender)
+    total_supply = base.mint(balance_of, total_supply, context.sender, amount)
+    return total_supply
+
+
+def burn(amount: int) -> int:
+    """Destroy tokens. Tokens are withdrawn from sender's account.
+    Returns new total supply.
+    """
+    global total_supply
+    _assert_is_authority(context.sender)
+    total_supply = base.burn(balance_of, total_supply, context.sender, amount)
+    return total_supply
+
+
+def approve(to_address: str, amount: int) -> bool:
+    """Allow specified address to spend/use some tokens from sender account.
+
+    The approval is set to specified amount.
+    """
+    return base.approve(allowances, context.sender, to_address, amount)
+
+
+def update_approve(to_address: str, delta_amount: int) -> int:
+    """Updates the amount specified address is allowed to spend/use from
+    sender account.
+
+    The approval is incremented of the specified amount. Negative amounts
+    decrease the approval.
+    """
+    return base.update_approve(allowances, context.sender, to_address,
+                               delta_amount)
+
+
+def transfer_from(from_address: str, to_address: str, amount: int) -> bool:
+    """Executes a transfer on behalf of another address to specified recipient.
+
+    Operation is only allowed if sender has sufficient allowance on the source
+    account.
+    """
+    return base.transfer_from(balance_of, allowances, context.sender,
+                              from_address, to_address, amount)
+
+
+def init(supply: int, name_: str, symbol_: str):
     """Initialise this token with a new name, symbol and supply."""
-    global name, symbol, total_supply, authority
-    name = name_
-    symbol = symbol_
-    total_supply = total_supply_ * 10 ** decimals
+    global total_supply, name, symbol, authority
 
+    name, symbol = name_, symbol_
+    balance_of[context.sender] = total_supply = (supply * 10 ** _decimals)
     authority = context.sender  # Creator becomes the authority.
-    balance_of[authority] = total_supply
 
 
 def _assert_is_authority(address: str):
@@ -98,11 +179,6 @@ def _assert_is_not_frozen():
 
 
 # Global accessors
-
-def get_total_supply() -> int:
-    """Gives the total number of permission tokens in circulation."""
-    return total_supply
-
 
 def allowed_users_count() -> int:
     """Gives the current number of users with at least one token."""
@@ -140,84 +216,6 @@ def set_permission_type(typ: int) -> int:
     return typ
 
 
-# Tokens management
-
-def get_balance(address: str) -> int:
-    """Gives the current balance of the specified user"""
-    return base.Balances(balance_of).get(address)
-
-
-def transfer(to_address: str, amount: int) -> bool:
-    """Execute a transfer of tokens from the sender to another user."""
-    sender = context.sender
-    if base.transfer(balance_of, sender, to_address, amount):
-        if sender == authority:
-            allowed(user=to_address, amount=amount)
-        else:
-            transferred(sender=sender, recipient=total_supply, amount=amount)
-        return True
-    return False
-
-
-def mint(amount: int) -> int:
-    """Request token creation and add created amount to sender balance.
-    Returns new total supply.
-    """
-    global total_supply
-
-    _assert_is_authority(context.sender)
-    new_supply = base.mint(balance_of, total_supply, context.sender, amount)
-    if new_supply != total_supply:
-        minted(sender=context.sender, amount=amount, new_supply=new_supply)
-
-    total_supply = new_supply
-    return total_supply
-
-
-def burn(amount: int) -> int:
-    """Destroy tokens. tokens are withdrawn from sender's account.
-    Returns new total supply.
-    """
-    global total_supply
-
-    _assert_is_authority(context.sender)
-    new_supply = base.burn(balance_of, total_supply, context.sender, amount)
-    if new_supply != total_supply:
-        burnt(sender=context.sender, amount=amount, new_supply=new_supply)
-
-    total_supply = new_supply
-    return total_supply
-
-
-def approve(to_address: str, amount: int) -> bool:
-    """Allow specified address to spend provided amount from sender account.
-
-    The approval is set to specified amount.
-    """
-    return base.approve(allowances, context.sender, to_address, amount)
-
-
-def update_approve(to_address: str, delta_amount: int) -> int:
-    """Allow specified address to spend more or less from sender account.
-
-    The approval is incremented of the specified amount. Negative amounts
-    decrease the approval.
-    """
-    return base.update_approve(allowances, context.sender, to_address,
-                               delta_amount)
-
-
-def transfer_from(from_address: str, to_address: str, amount: int) -> bool:
-    """Require Transfer from another address to specified recipient. Operation
-    is only allowed if sender has sufficient allowance on the source account.
-    """
-    if base.transfer_from(balance_of, allowances, context.sender, from_address,
-                          to_address, amount):
-        transferred(sender=from_address, recipient=total_supply, amount=amount)
-        return True
-
-    return False
-
 # Permission operations
 
 def revoke(address: str, amount: int) -> int:
@@ -228,10 +226,10 @@ def revoke(address: str, amount: int) -> int:
     :return: The final balance of the address.
     """
     _assert_is_authority(context.sender)
-
     amount = min(amount, get_balance(address))
-    if base.transfer(balance_of, address, authority, amount):
-        revoked(user=address, amount=amount)
+    base.Balances(balance_of).transfer(context.sender, address, amount)
+    revoked(user=address, amount=amount)
+
     return base.Balances(balance_of).get(address)
 
 
@@ -248,13 +246,11 @@ def use_token() -> bool:
         return False
 
     # then handle consequences regarding token type.
+    success = True
     if permission_type == _PERM_TYPE_RETURNED:
         success = transfer(authority, 1)
     elif permission_type == _PERM_TYPE_CONSUMED:
-        total_supply = base.burn(balance_of, total_supply, context.sender, 1)
-        success = True
-    else:
-        success = True
+        total_supply = burn(1)
 
     # Finally, raise appropriate event
     if success:
