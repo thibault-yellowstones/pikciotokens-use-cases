@@ -7,9 +7,9 @@ def test_shares():
     # Let's create a new market share.
     context.sender = "Pikcio SA"
     shares.init(
+        supply=13000000,
         name_="Pikciotronics Ltd",
-        symbol_="PKT",
-        total_supply_=13000000
+        symbol_="PKT"
     )
 
     # Add another shareholder

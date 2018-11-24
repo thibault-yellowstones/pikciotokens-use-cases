@@ -10,9 +10,9 @@ def test_vote():
     voters_count = 10000
     context.sender = 'vote place'
     vote.init(
+        supply=voters_count,
         name_="What is the best way to eat strawberries?",
-        symbol_="STBY",
-        total_supply_=voters_count
+        symbol_="STBY"
     )
     print("Today's question is: {}".format(vote.name))
 

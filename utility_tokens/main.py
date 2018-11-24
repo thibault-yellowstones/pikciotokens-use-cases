@@ -6,9 +6,9 @@ import loyalty_card
 def test_loyalty_card():
     # Let's create a loyalty card...
     loyalty_card.init(
+        supply=0,  # Created on the fly. There is no supply of points.
         name_="Pikzeria",
-        symbol_="PIKZ",
-        total_supply_=0  # Created on the fly. There is no supply of points.
+        symbol_="PIKZ"
     )
 
     # And add a few gifts to the catalog.
