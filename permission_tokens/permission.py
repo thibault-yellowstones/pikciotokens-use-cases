@@ -12,18 +12,47 @@ decimals = 0  # No decimals. Permissions cannot be divided.
 total_supply = 0
 balance_of = {}
 # type: Dict[str,int]
+allowances = {}
+# type: Dict[str,Dict[str,int]]
+"""Gives for each customer a map to the amount delegates are allowed to spend 
+on their behalf."""
 
 base.missing_balance_means_zero = True
 """Someone who has no token has no permission. Thus having no account is 
 equivalent.
 """
 
+# Constants
+
+_PERM_TYPE_REUSABLE = 0
+"""Once a token is given to a user, it can be used without restriction (until 
+revoked).
+
+This type of token works well with persistent permissions, as a door pass for
+example. 
+"""
+
+_PERM_TYPE_RETURNED = 1
+"""Permission tokens return to authority once used.
+
+This is great for enabling temporary access to a resource.
+"""
+
+_PERM_TYPE_CONSUMED = 2
+"""Permission token is burnt once used.
+
+This fits cases where the number of resources is limited and can only be 
+accessed once. For example, a ticket to a concert cannot be transferred to 
+anyone else once the customer has entered the concert room. (limited seats,
+unique usage).
+"""
+
 # Special attributes
 authority = ''
 """The primary account which dispatches tokens."""
 
-is_ephemeral = False
-"""A consumable permission token returns to the authority when it is used"""
+permission_type = _PERM_TYPE_REUSABLE
+"""Defines the behaviour of the token once used."""
 
 is_frozen = False
 """If True, all permissions are frozen and no one can access."""
@@ -39,6 +68,10 @@ access_denied = events.register("access_denied", "user", "why")
 """Fired when the authority states that an user can't access"""
 transferred = events.register("transferred", "sender", "recipient", "amount")
 """Fired when an user transfers tokens to another user."""
+burnt = events.register("burn", "sender", "amount", "new_supply")
+"""Fired when the authority destroyed some tokens."""
+minted = events.register("mint", "sender", "amount", "new_supply")
+"""Fired when the authority created some tokens."""
 
 
 def init(name_: str, symbol_: str, total_supply_):
@@ -67,7 +100,7 @@ def _assert_is_not_frozen():
 # Global accessors
 
 def get_total_supply() -> int:
-    """Gives the total number of permission tokens emitted."""
+    """Gives the total number of permission tokens in circulation."""
     return total_supply
 
 
@@ -86,9 +119,9 @@ def is_permission_frozen() -> bool:
     return is_frozen
 
 
-def is_token_ephemeral() -> bool:
-    """Tells if tokens get consumed when used."""
-    return is_ephemeral
+def get_permission_type() -> int:
+    """Returns a value indicating how a token behaves when used."""
+    return permission_type
 
 
 def freeze_permission(state: bool) -> bool:
@@ -99,12 +132,12 @@ def freeze_permission(state: bool) -> bool:
     return state
 
 
-def set_token_ephemeral(state: bool) -> bool:
-    """Defines the token ephemeral attribute and returns the previous value."""
+def set_permission_type(typ: int) -> int:
+    """Defines the token type and returns the previous value."""
     _assert_is_authority(context.sender)
-    global is_ephemeral
-    state, is_ephemeral = is_ephemeral, state
-    return state
+    global permission_type
+    typ, permission_type = permission_type, typ
+    return typ
 
 
 # Tokens management
@@ -126,6 +159,67 @@ def transfer(to_address: str, amount: int) -> bool:
     return False
 
 
+def mint(amount: int) -> int:
+    """Request token creation and add created amount to sender balance.
+    Returns new total supply.
+    """
+    global total_supply
+
+    _assert_is_authority(context.sender)
+    new_supply = base.mint(balance_of, total_supply, context.sender, amount)
+    if new_supply != total_supply:
+        minted(sender=context.sender, amount=amount, new_supply=new_supply)
+
+    total_supply = new_supply
+    return total_supply
+
+
+def burn(amount: int) -> int:
+    """Destroy tokens. tokens are withdrawn from sender's account.
+    Returns new total supply.
+    """
+    global total_supply
+
+    _assert_is_authority(context.sender)
+    new_supply = base.burn(balance_of, total_supply, context.sender, amount)
+    if new_supply != total_supply:
+        burnt(sender=context.sender, amount=amount, new_supply=new_supply)
+
+    total_supply = new_supply
+    return total_supply
+
+
+def approve(to_address: str, amount: int) -> bool:
+    """Allow specified address to spend provided amount from sender account.
+
+    The approval is set to specified amount.
+    """
+    return base.approve(allowances, context.sender, to_address, amount)
+
+
+def update_approve(to_address: str, delta_amount: int) -> int:
+    """Allow specified address to spend more or less from sender account.
+
+    The approval is incremented of the specified amount. Negative amounts
+    decrease the approval.
+    """
+    return base.update_approve(allowances, context.sender, to_address,
+                               delta_amount)
+
+
+def transfer_from(from_address: str, to_address: str, amount: int) -> bool:
+    """Require Transfer from another address to specified recipient. Operation
+    is only allowed if sender has sufficient allowance on the source account.
+    """
+    if base.transfer_from(balance_of, allowances, context.sender, from_address,
+                          to_address, amount):
+        transferred(sender=from_address, recipient=total_supply, amount=amount)
+        return True
+
+    return False
+
+# Permission operations
+
 def revoke(address: str, amount: int) -> int:
     """Removes specified amount (at max) of tokens from provided address.
 
@@ -141,18 +235,31 @@ def revoke(address: str, amount: int) -> int:
     return base.Balances(balance_of).get(address)
 
 
-def require_access() -> bool:
+def use_token() -> bool:
     """Grants or deny access to the sender, depending on the tokens owned."""
+    global total_supply
+
     try:
+        # First check base permission requirements
         _assert_is_not_frozen()
         base.Balances(balance_of).require(context.sender, 1)
     except ValueError as e:
         access_denied(user=context.sender, why=str(e))
         return False
 
-    if not is_ephemeral or transfer(authority, 1):
-        access_granted(user=context.sender)
-        return True
+    # then handle consequences regarding token type.
+    if permission_type == _PERM_TYPE_RETURNED:
+        success = transfer(authority, 1)
+    elif permission_type == _PERM_TYPE_CONSUMED:
+        total_supply = base.burn(balance_of, total_supply, context.sender, 1)
+        success = True
+    else:
+        success = True
 
-    access_denied(user=context.sender, why="Unknown error")
-    return False
+    # Finally, raise appropriate event
+    if success:
+        access_granted(user=context.sender)
+    else:
+        access_denied(user=context.sender, why="Unknown error")
+
+    return success

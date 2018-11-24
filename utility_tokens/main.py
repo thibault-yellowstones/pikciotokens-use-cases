@@ -4,10 +4,11 @@ import loyalty_card
 
 
 def test_loyalty_card():
-    # Let's create Luigi's loyalty card...
+    # Let's create a loyalty card...
     loyalty_card.init(
-        name_="Luigi's Pizzeria",
-        symbol_="PIZZ"
+        name_="Pikzeria",
+        symbol_="PIKZ",
+        total_supply_=0  # Created on the fly. There is no supply of points.
     )
 
     # And add a few gifts to the catalog.

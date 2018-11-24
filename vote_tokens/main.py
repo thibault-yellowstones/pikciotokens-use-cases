@@ -18,7 +18,7 @@ def test_vote():
 
     # Add a few options...
     candidates = (
-        "Raw. Natural is best.",
+        "With a friend at Pikcio.",
         "With Yogurt and sugar.",
         "In a tart, with a scoop of ice cream.",
         "As jam on a toast."
