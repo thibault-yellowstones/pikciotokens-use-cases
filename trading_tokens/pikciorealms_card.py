@@ -1,3 +1,16 @@
+"""In the PikcioRealms world, each token describes a card that is part of a
+trading card game.
+
+Characteristics are set once for all just after the token creation. Each card
+then has its own supply and characteristic embedded in the token.
+
+The cards can be exchanged in order to create powerful combinations, depending
+on the actual rules of this fictive trading card game.
+
+This kind of token is particular, as it represents only a part of a greater
+system involving several tokens.
+"""
+
 from pikciotok import base, context
 
 _TOKEN_VERSION = "T1.0"
@@ -6,7 +19,7 @@ name = ''
 """The friendly name of the token"""
 symbol = ''
 """The symbol of the token currency. Should be 3 or 4 characters long."""
-_decimals = 1  # A card cannot be split.
+_decimals = 0  # A card cannot be split.
 """Maximum number of decimals to express any amount of that token."""
 total_supply = 0
 """The current amount of the token on the market, in case some has been minted 
@@ -173,7 +186,16 @@ def get_rarity() -> str:
     )
 
 
+def get_characteristics() -> dict:
+    """Returns a dictionary describing this card."""
+    return {
+        attribute: globals()["get_" + attribute]()
+        for attribute in ("name", "race", "element", "level", "effect",
+                          "attack", "defense", "stamina", "magic", "rarity")
+    }
+
 # Actions
+
 
 def transfer(to_address: str, amount: int) -> bool:
     """Execute a transfer from the sender to the specified address."""

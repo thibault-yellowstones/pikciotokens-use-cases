@@ -1,3 +1,18 @@
+"""The shares token helps to maintain a registry of shareholders, along with
+the rights associated to their weight.
+
+Those rights are driven by the vote policy, which can be "One dollar one vote"
+or "One person one vote".
+
+This token has a flaw: everyone can change the vote policy, mint or burn
+tokens. We could imagine that only a majority shareholder can do that for
+example.
+
+This token allows shareholders to delegate their power to other shareholders
+using allowances, making a difference between "organic" shares/weight and
+actual one.
+"""
+
 import itertools
 from typing import List, Tuple
 
@@ -12,7 +27,7 @@ name = ''
 """The friendly name of the token"""
 symbol = ''
 """The symbol of the token currency. Should be 3 or 4 characters long."""
-_decimals = base.MAX_TOKEN_DECIMALS
+decimals = base.MAX_TOKEN_DECIMALS
 """Maximum number of decimals to express any amount of that token."""
 total_supply = 0
 """The current amount of the token on the market, in case some has been minted 
@@ -83,7 +98,7 @@ def init(supply: int, name_: str, symbol_: str):
     global total_supply, name, symbol
 
     name, symbol = name_, symbol_
-    balance_of[context.sender] = total_supply = (supply * 10 ** _decimals)
+    balance_of[context.sender] = total_supply = (supply * 10 ** decimals)
 
 
 # Properties
@@ -100,7 +115,7 @@ def get_symbol() -> str:
 
 def get_decimals() -> int:
     """Gets the number of decimals of the token."""
-    return _decimals
+    return decimals
 
 
 def get_total_supply() -> int:

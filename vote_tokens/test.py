@@ -1,3 +1,8 @@
+"""This test shows how one can simply create a poll with the vote token and let
+people decide which option they prefer.
+
+This is not a unit test.
+"""
 from random import Random
 
 from pikciotok import context

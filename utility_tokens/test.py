@@ -1,3 +1,8 @@
+"""The test shows how one can create a gift catalog, dispatch points and then
+let customers use their point to get those gifts.
+
+This is not a unit test.
+"""
 from pikciotok import context
 
 import loyalty_card

@@ -1,3 +1,11 @@
+"""The test shows all the attributes that can be deduced from simply defining
+rules and transferring a particular amount to a shareholder.
+
+This is not a unit test.
+"""
+
+# We need to override the context sender to mimic a call from a particular
+# account.
 from pikciotok import context
 
 import shares
@@ -23,9 +31,7 @@ def test_shares():
     print("Is John majority ?: " + str(shares.is_majority("John Doe")))
 
     # Now let's change how vote works
-    print()
-    print("Changing vote policy to 'One person one vote'")
-    print()
+    print("\nChanging vote policy to 'One person one vote'\n")
     shares.set_vote_mode(shares._VOTE_POLICY_OPOV)
 
     # And see how tables turn

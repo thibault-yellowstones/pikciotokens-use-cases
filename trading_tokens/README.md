@@ -1,0 +1,2 @@
+# Equity Tokens
+Equity tokens are a subcategory of security tokens that represent ownership of an asset, such as debt or company stock. By employing blockchain technology and smart contracts, a startup could forgo a traditional initial public offering (IPO) and instead issue shares and voting rights over the blockchain. Additionally, a lender could create tokens that represent debt owned by the company, enabling loans to be bought and sold in a high-liquidity environment.
