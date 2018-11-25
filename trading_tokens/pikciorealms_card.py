@@ -1,6 +1,4 @@
-from typing import List, Dict
-
-from pikciotok import base, context, events
+from pikciotok import base, context
 
 _TOKEN_VERSION = "T1.0"
 
@@ -8,7 +6,7 @@ name = ''
 """The friendly name of the token"""
 symbol = ''
 """The symbol of the token currency. Should be 3 or 4 characters long."""
-_decimals = 0  # A point cannot be split.
+_decimals = 1  # A card cannot be split.
 """Maximum number of decimals to express any amount of that token."""
 total_supply = 0
 """The current amount of the token on the market, in case some has been minted 
@@ -21,41 +19,76 @@ allowances = {}
 """Gives for each customer a map to the amount delegates are allowed to spend 
 on their behalf."""
 
-base.missing_balance_means_zero = False
-"""We do not want to delete accounts of customers who have spent all of their 
-points. So let's prevent that auto-removal by clearly stating that an empty 
-account is not equal to a missing one."""
+ruler = ''
+"""Address of the ruler of the game, emitting this token."""
 
-# Special attributes
-
-bank_account = ''
-"""The 'bank' account, getting the points when a client spends them.
-This is an easy to check how many points have been spent.
-"""
-gift_catalog = {}
-# type: Dict[str, int]
-"""Contains a mapping of all the gifts that can be purchased using the loyalty 
-points. Each name is mapped to a price. The case is simplified as we assume 
-there is no limit on the quantity per gift.
-"""
-
-
-# Events
-purchased = events.register("purchased", "gift", "by")
-"""The only event we are interested in is the purchase of a gift."""
+# Card characteristics
+# In the magical world of PikcioRealms, characters have
+# A race, like Human or Ork,
+race = ''
+# An element, that gives them special powers, like Earth, Wind or Fire
+element = ''
+# A general level, to state how strong they are.
+level = 0
+# The effect of the card.
+effect = ''
+# Game characteristics
+attack = 0
+defense = 0
+stamina = 0
+magic = 0
 
 
 # Initializer
+# The initializer is partial here. init_card needs to be called afterwards.
 
 def init(supply: int, name_: str, symbol_: str):
     """Initialise this token with a new name, symbol and supply."""
-    global total_supply, name, symbol, bank_account
+    global total_supply, name, symbol, ruler
 
     name, symbol = name_, symbol_
     balance_of[context.sender] = total_supply = (supply * 10 ** _decimals)
+    ruler = context.sender
 
-    # It is assumed that the token initiator is "the bank".
-    bank_account = context.sender
+
+def _assert_is_ruler(address: str):
+    """Raises an exception if provided address is not the bank."""
+    if address != ruler:
+        raise ValueError("'{} is not the ruler".format(address))
+
+
+def _assert_characteristics_set():
+    """Raises an exception if the card details have not been set yet."""
+    if not race:
+        raise RuntimeError("Token characteristics have not been set yet.")
+
+
+def _assert_characteristics_not_set():
+    """Raises an exception if the card details have already been set."""
+    if race:
+        raise RuntimeError("Token characteristics have already been set yet.")
+
+
+def init_card(race_: str, element_: str, level_: int, effect_: str,
+              attack_: int, defense_: int, stamina_: 0, magic_: 0):
+    """Puts a meaning on the tokens emitted.
+
+    All characteristics of the card are set. Please note that this method can
+    only be called once. Afterwards the card details are set forever.
+    """
+    _assert_is_ruler(context.sender)
+    _assert_characteristics_not_set()
+
+    global race, element, level, effect, attack, defense, stamina, magic
+
+    race = race_
+    element = element_
+    level = level_
+    effect = effect_
+    attack = attack_
+    defense = defense_
+    stamina = stamina_
+    magic = magic_
 
 
 # Properties
@@ -90,6 +123,56 @@ def get_allowance(allowed_address: str, on_address: str) -> int:
     return base.Allowances(allowances).get_one(on_address, allowed_address)
 
 
+def get_race() -> str:
+    """Gets the card race."""
+    return race
+
+
+def get_element() -> str:
+    """Gets the card element."""
+    return element
+
+
+def get_level() -> int:
+    """Gets the card level."""
+    return level
+
+
+def get_effect() -> str:
+    """Gets the card effect."""
+    return effect
+
+
+def get_attack() -> int:
+    """Gets the card attack."""
+    return attack
+
+
+def get_defense() -> int:
+    """Gets the card defense."""
+    return defense
+
+
+def get_stamina() -> int:
+    """Gets the card stamina."""
+    return stamina
+
+
+def get_magic() -> int:
+    """Gets the card magic."""
+    return magic
+
+
+def get_rarity() -> str:
+    """Rarity is an indicator driven by total supply of the card"""
+    return (
+        "common" if total_supply > 20000 else
+        "uncommon" if total_supply > 10000 else
+        "rare" if total_supply > 5000 else
+        "legendary"
+    )
+
+
 # Actions
 
 def transfer(to_address: str, amount: int) -> bool:
@@ -102,6 +185,7 @@ def mint(amount: int) -> int:
     Returns new total supply.
     """
     global total_supply
+    _assert_is_ruler(context.sender)
     total_supply = base.mint(balance_of, total_supply, context.sender, amount)
     return total_supply
 
@@ -111,6 +195,8 @@ def burn(amount: int) -> int:
     Returns new total supply.
     """
     global total_supply
+    # A player might decide to destroy a card, if he possesses it, so no:
+    # _assert_is_ruler(context.sender)
     total_supply = base.burn(balance_of, total_supply, context.sender, amount)
     return total_supply
 
@@ -142,78 +228,3 @@ def transfer_from(from_address: str, to_address: str, amount: int) -> bool:
     """
     return base.transfer_from(balance_of, allowances, context.sender,
                               from_address, to_address, amount)
-
-
-# Catalog management
-
-def _assert_is_bank(address: str):
-    """Raises an exception if provided address is not the bank."""
-    if address != bank_account:
-        raise ValueError("'{} is not the bank".format(address))
-
-
-def get_catalog_size() -> int:
-    """Gets the current size of the catalog."""
-    return len(gift_catalog)
-
-
-def add_update_catalog(gifts: Dict[str, int]) -> int:
-    """Adds or updates items in the catalog.
-
-    :param gifts: Must be a dictionary mapping gift names to their price.
-    :return: The new size of the catalog.
-    """
-    global gift_catalog
-    _assert_is_bank(context.sender)
-
-    gift_catalog.update(gifts)
-    return get_catalog_size()
-
-
-def remove_from_catalog(gift_names: List[str]) -> int:
-    """Removes items from the catalog. If an item is already missing, its
-    removal has no effect.
-
-    :param gift_names: List of names to remove from the catalog.
-    :return: The new size of the catalog.
-    """
-    global gift_catalog
-    _assert_is_bank(context.sender)
-
-    for gift_name in gift_names:
-        if gift_name in gift_names:
-            del gift_catalog[gift_name]
-    return get_catalog_size()
-
-
-# Global accessors
-
-def get_total_spent() -> int:
-    """Gives the total number of points spent by all customers."""
-    return base.Balances(balance_of).get(bank_account)
-
-
-# Accounts management
-
-def grant(to_address: str, amount: int) -> int:
-    """Gives points to provided customer. Points are created."""
-    global total_supply
-    _assert_is_bank(context.sender)
-
-    total_supply = base.mint(balance_of, total_supply, to_address, amount)
-    return total_supply
-
-
-def purchase(gift_name: str) -> int:
-    """Request a purchase on specified gift from sender.
-    A purchase event is fired if the purchase is successful.
-
-    :param gift_name: Name of the gift to buy.
-    :return: The new balance of the customer.
-    """
-    if gift_name not in gift_catalog:
-        raise KeyError("No such gift: '{}'".format(gift_name))
-
-    if transfer(bank_account, gift_catalog[gift_name]):
-        purchased(gift=gift_name, by=context.sender)
-    return get_balance(context.sender)
