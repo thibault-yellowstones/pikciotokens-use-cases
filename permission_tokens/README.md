@@ -1,2 +1,27 @@
-# Equity Tokens
-Equity tokens are a subcategory of security tokens that represent ownership of an asset, such as debt or company stock. By employing blockchain technology and smart contracts, a startup could forgo a traditional initial public offering (IPO) and instead issue shares and voting rights over the blockchain. Additionally, a lender could create tokens that represent debt owned by the company, enabling loans to be bought and sold in a high-liquidity environment.
+# Permission Token
+
+## Type 
+**Utility token (SEC) / Utility token (FINMA)**
+
+> Provides access to the goods & services that a project offers.
+
+https://medium.com
+
+## Description
+The permission token enables to provide and then verify access to a
+resource. There is one token per accessed resource. Users can require, exchange
+and later use tokens representing access to the resource.
+
+This token can be configured to give 3 different types of permissions:
+- unrestricted access to an unlimited resource:
+  Reusable permission, like a door pass, an admin right, etc...
+- restricted access to an unlimited resource:
+  Make 3 wishes, use 100 times an API for free, etc...
+- restricted access to a limited resource:
+  Eat 2 cookies, Get 4 seats at a concert, etc...
+
+The type influences the side effect at the moment the token is used only.
+
+
+## Advantages 
+

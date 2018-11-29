@@ -1,6 +1,18 @@
-# Utility Tokens
-Utility tokens, often called app coins or user tokens, provide users with future access to a product or service. Through utility token ICOs, startups can raise capital to fund the development of their blockchain projects, and users can purchase future access to that service, sometimes at a discount off the finished product’s sticker price.
+# Loyalty Card Token
 
-An example of a utility token is the Basic Attention Token (BAT). As Strategic Coin explains in its BAT token launch research report, the BAT token functions as a medium exchange between users, advertisers, and publishers who participate in the Brave browser ecosystem. Advertisers purchase ads using BAT tokens, which are then distributed among both publishers and browser users as compensation for hosting the ads and viewing them, respectively. 
+## Type 
+**Utility token (SEC) / Utility token (FINMA)**
 
-Utility tokens are not designed as investments; however, many people contribute to utility token ICOs with the hope that the value of the tokens will increase as demand for the company’s product or service increases. Utility token price fluctuations can be compared to those of sporting event tickets. The value of a ticket to a future sporting event may increase if one or both of the teams wins a significant number of games and becomes a contender for the championship. On the other hand, that same ticket may decrease in value if a star player suffers an injury or a team goes on a prolonged losing streak.
+> Provides access to the goods & services that a project offers.
+
+https://medium.com
+
+## Description
+The loyalty card defines two roles: a bank account and customers.
+
+The bank account which creates the token is responsible for granting points
+and maintaining the catalog. Customers can use their points to get items from
+the catalog.
+
+## Advantages 
+
