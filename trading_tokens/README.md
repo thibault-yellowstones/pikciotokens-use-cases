@@ -20,5 +20,21 @@ on the actual rules of this fictive trading card game.
 This kind of token is particular, as it represents only a part of a greater
 system involving several tokens.
 
-## Advantages 
+## Characteristics
+
+This token has following properties.
+
+### Decimals 
+
+### Supply management
+
+### Roles
+
+### Mint/Burn conditions
+
+### Transfer conditions
+
+### Allowances conditions
+
+
 

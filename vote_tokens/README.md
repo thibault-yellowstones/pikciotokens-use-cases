@@ -20,19 +20,20 @@ on the actual rules of this fictive trading card game.
 This kind of token is particular, as it represents only a part of a greater
 system involving several tokens.
 
-## Advantages 
+## Characteristics
 
-The vote token allows to create poll on people or topics.
+This token has following properties.
 
-Before starting the vote, the vote place (token creator) defines a list of
-candidates.
+### Decimals 
 
-Once the vote is started, everyone except the candidate and the vote place
-receives one and only one token.
+### Supply management
 
-Afterwards, people send their token to the candidate they like the most.
-The vote is stopped when everyone has voted or when the vote place decides to
-interrupt the vote.
+### Roles
 
-Once the vote is stopped, everyone can see results, like the winner and the
-participation.
+### Mint/Burn conditions
+
+### Transfer conditions
+
+### Allowances conditions
+
+

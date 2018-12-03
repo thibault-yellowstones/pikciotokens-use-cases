@@ -12,7 +12,6 @@ This token allows shareholders to delegate their power to other shareholders
 using allowances, making a difference between "organic" shares/weight and
 actual one.
 """
-
 import itertools
 from typing import List, Tuple
 
@@ -27,7 +26,7 @@ name = ''
 """The friendly name of the token"""
 symbol = ''
 """The symbol of the token currency. Should be 3 or 4 characters long."""
-decimals = base.MAX_TOKEN_DECIMALS
+decimals = 0
 """Maximum number of decimals to express any amount of that token."""
 total_supply = 0
 """The current amount of the token on the market, in case some has been minted 
@@ -90,15 +89,24 @@ dividend = 0.0
 vote_mode = _VOTE_POLICY_ODOV
 """Specifies how a shareholder weighs in an assembly vote."""
 
+emitter = ''
+"""Address of the acount emitting the shares."""
+
+delegations = {}
+# type: Dict[str,str]
+"""Gives for a shareholder an other shareholder who holds its voting power."""
+
 
 # Initializer
 
+
 def init(supply: int, name_: str, symbol_: str):
     """Initialise this token with a new name, symbol and supply."""
-    global total_supply, name, symbol
+    global total_supply, name, symbol, emitter
 
     name, symbol = name_, symbol_
-    balance_of[context.sender] = total_supply = (supply * 10 ** decimals)
+    emitter = context.sender
+    balance_of[emitter] = total_supply = (supply * 10 ** decimals)
 
 
 # Properties
@@ -125,6 +133,12 @@ def get_total_supply() -> int:
 
 # Actions
 
+def _assert_is_emitter(address: str):
+    """Raises an exception if address is not the issuer of the shares."""
+    if address != emitter:
+        raise ValueError("'{} is not the emitter".format(address))
+
+
 def transfer(to_address: str, amount: int) -> bool:
     """Execute a transfer from the sender to the specified address."""
     return base.transfer(balance_of, context.sender, to_address, amount)
@@ -135,6 +149,8 @@ def mint(amount: int) -> int:
     Returns new total supply.
     """
     global total_supply
+
+    _assert_is_emitter(context.sender)
     total_supply = base.mint(balance_of, total_supply, context.sender, amount)
     return total_supply
 
@@ -144,7 +160,50 @@ def burn(amount: int) -> int:
     Returns new total supply.
     """
     global total_supply
+
+    _assert_is_emitter(context.sender)
     total_supply = base.burn(balance_of, total_supply, context.sender, amount)
+    return total_supply
+
+
+def split_stock(factor: float) -> int:
+    """Splits the stock by provided factor.
+
+    Please note that factor is theoric, as the stock of each shareholder will
+    be rounded after applying it.
+
+    This means that most often sum(new balances) != total_supply * factor.
+
+    :param factor: The theoric factor to apply on the stock. Has to be above 0.
+    :return: The new total supply.
+    """
+    global total_supply
+
+    _assert_is_emitter(context.sender)
+    if factor <= 0:
+        raise ValueError('A split factor of {} is invalid'.format(factor))
+
+    # Update balances accordingly
+    for account in balance_of:
+        balance_of[account] = int(balance_of[account] * factor)
+
+    # Now collect the sum: it is the new total supply
+    # Note that it is probably different than total_supply * factor
+    # because of the rounding.
+    new_total_supply = sum(balance_of[account] for account in balance_of)
+
+    # Procedure has created or destroyed money. Let's raise appropriate event.
+    delta_supply = new_total_supply - total_supply
+
+    if delta_supply > 0:
+        base.minted(sender=emitter, amount=delta_supply,
+                    new_supply=new_total_supply)
+    elif delta_supply < 0:
+        base.burnt(sender=emitter, amount=-delta_supply,
+                   new_supply=new_total_supply)
+
+    # Finally update total supply.
+    total_supply = new_total_supply
     return total_supply
 
 
@@ -196,6 +255,8 @@ def set_vote_mode(mode: int) -> int:
     :return: The old mode.
     """
     global vote_mode
+
+    _assert_is_emitter(context.sender)
     vote_mode, mode = mode, vote_mode
     return mode
 
@@ -208,6 +269,8 @@ def get_vote_mode() -> int:
 def set_dividend(dividend_: float) -> float:
     """Updates the current dividend rate. Returns the old one."""
     global dividend
+
+    _assert_is_emitter(context.sender)
     dividend, dividend_ = dividend_, dividend
     return dividend_
 
@@ -215,6 +278,43 @@ def set_dividend(dividend_: float) -> float:
 def get_dividend() -> float:
     """Tells what is the current dividend rate."""
     return dividend
+
+
+# Delegation
+
+def set_delegate(to_address: str) -> str:
+    """Allow specified address to vote in lieu of the sender.
+
+    :return: The previous delegation or empty string if none
+    """
+    if not to_address:
+        raise ValueError('Delegate address cannot be falsy while granting '
+                         'delegation.')
+    previous_delegate = get_delegate()
+    delegations[context.sender] = to_address
+    return previous_delegate
+
+
+def remove_delegate() -> str:
+    """Removes the delegation of the current user.
+
+    :return: The previous delegation or empty string if none
+    """
+    previous_delegate = get_delegate()
+    if previous_delegate:
+        del delegations[context.sender]
+    return previous_delegate
+
+
+def get_delegate(address: str = None) -> str:
+    """Obtains the current delegate of the provided shareholder.
+
+    :param address: The address of the shareholder to get delegation. If none
+        provided, returns the sender's delegate address.
+
+    :return: The address of the delegate, or empty string if none.
+    """
+    return delegations.get(address or context.sender, '')
 
 
 # Shares related info
@@ -255,8 +355,7 @@ def is_delegating(address: str = None) -> bool:
         If none provided, uses the sender's delegate address.
     :return: True if the address is currently delegating its share power.
     """
-    _assert_is_shareholder(address)
-    return base.Allowances(allowances).has_allowances(address)
+    return bool(get_delegate(address))
 
 
 def get_delegators(address: str = None) -> Tuple:
@@ -269,11 +368,7 @@ def get_delegators(address: str = None) -> Tuple:
         address.
     """
     _assert_is_shareholder(address)
-    allowances_ex = base.Allowances(allowances)
-    return tuple(
-        account for account in balance_of
-        if allowances_ex.is_allowed(account, address)
-    )
+    return tuple(addr for addr in delegations if delegations[addr] == address)
 
 
 def get_organic_shares(address: str = None) -> int:

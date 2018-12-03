@@ -14,5 +14,22 @@ The bank account which creates the token is responsible for granting points
 and maintaining the catalog. Customers can use their points to get items from
 the catalog.
 
-## Advantages 
+## Characteristics
+
+This token has following properties.
+
+### Decimals 
+
+### Supply management
+
+### Roles
+
+### Mint/Burn conditions
+
+### Transfer conditions
+
+### Allowances conditions
+
+
+
 

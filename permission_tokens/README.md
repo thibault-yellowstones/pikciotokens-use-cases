@@ -22,6 +22,22 @@ This token can be configured to give 3 different types of permissions:
 
 The type influences the side effect at the moment the token is used only.
 
+## Characteristics
 
-## Advantages 
+This token has following properties.
+
+### Decimals 
+
+### Supply management
+
+### Roles
+
+### Mint/Burn conditions
+
+### Transfer conditions
+
+### Allowances conditions
+
+
+
 
