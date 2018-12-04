@@ -13,8 +13,9 @@ interrupt the vote.
 Once the vote is stopped, everyone can see results, like the winner and the
 participation.
 """
+import functools
 from datetime import datetime
-from typing import List
+from typing import List, Callable
 
 from pikciotok import base, context, events
 
@@ -133,7 +134,7 @@ def get_allowance(allowed_address: str, on_address: str) -> int:
 
 def transfer(to_address: str, amount: int) -> bool:
     """Execute a transfer from the sender to the specified address."""
-    return base.transfer(balance_of, context.sender, to_address, amount)
+    raise NotImplementedError()
 
 
 def mint(amount: int) -> int:
@@ -185,8 +186,7 @@ def transfer_from(from_address: str, to_address: str, amount: int) -> bool:
     Operation is only allowed if sender has sufficient allowance on the source
     account.
     """
-    return base.transfer_from(balance_of, allowances, context.sender,
-                              from_address, to_address, amount)
+    raise NotImplementedError()
 
 
 # Global accessors
@@ -373,7 +373,7 @@ def clear() -> bool:
     return True
 
 
-def vote(address: str) -> bool:
+def _do_vote(address: str, transfer_func: Callable) -> bool:
     """Puts a ballot in provided candidate urn."""
     global vote_stop_reason, vote_end
 
@@ -381,7 +381,7 @@ def vote(address: str) -> bool:
     _assert_vote_not_stopped()
     _assert_is_candidate(address)
 
-    if not base.transfer(balance_of, context.sender, address, 1):
+    if not transfer_func(balance_of=balance_of, to_address=address, amount=1):
         return False
 
     voted(participation=get_participation(),
@@ -393,6 +393,27 @@ def vote(address: str) -> bool:
         vote_end = datetime.utcnow().timestamp()
         completed(winner=get_winner(), duration=get_vote_duration())
     return True
+
+
+def vote(address: str) -> bool:
+    """Puts a ballot in provided candidate urn."""
+    # This is python sauce...
+    # We "prepare" a transfer function with some preset arguments.
+    # This will make it valid when called inside _do_vote
+    transfer_func = functools.partial(base.transfer, sender=context.sender)
+    return _do_vote(address, transfer_func)
+
+
+def vote_from(from_address, address: str) -> bool:
+    """Puts a ballot for another voter in provided candidate urn."""
+    # This is python sauce...
+    # We "prepare" a transfer function with some preset arguments.
+    # This will make it valid when called inside _do_vote
+    transfer_func = functools.partial(
+        base.transfer_from, allowances=allowances, delegate=context.sender,
+        sender=from_address
+    )
+    return _do_vote(address, transfer_func)
 
 
 # Poll info

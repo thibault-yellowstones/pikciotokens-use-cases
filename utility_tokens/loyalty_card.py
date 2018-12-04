@@ -1,8 +1,7 @@
-"""The loyalty card defines two roles: a bank account and customers.
+"""The loyalty card lets customers collect points on an account.
 
-The bank account which creates the token is responsible for granting points
-and maintaining the catalog. Customers can use their points to get items from
-the catalog.
+Customers can use their points to get items from a catalog defined by the owner
+of the token.
 """
 
 from typing import List, Dict
@@ -99,6 +98,12 @@ def get_allowance(allowed_address: str, on_address: str) -> int:
 
 # Actions
 
+def _assert_is_bank(address: str):
+    """Raises an exception if provided address is not the bank."""
+    if address != bank_account:
+        raise ValueError("'{} is not the bank".format(address))
+
+
 def transfer(to_address: str, amount: int) -> bool:
     """Execute a transfer from the sender to the specified address."""
     return base.transfer(balance_of, context.sender, to_address, amount)
@@ -109,6 +114,8 @@ def mint(amount: int) -> int:
     Returns new total supply.
     """
     global total_supply
+
+    _assert_is_bank(context.sender)
     total_supply = base.mint(balance_of, total_supply, context.sender, amount)
     return total_supply
 
@@ -118,6 +125,8 @@ def burn(amount: int) -> int:
     Returns new total supply.
     """
     global total_supply
+
+    _assert_is_bank(context.sender)
     total_supply = base.burn(balance_of, total_supply, context.sender, amount)
     return total_supply
 
@@ -127,7 +136,7 @@ def approve(to_address: str, amount: int) -> bool:
 
     The approval is set to specified amount.
     """
-    return base.approve(allowances, context.sender, to_address, amount)
+    raise NotImplementedError()
 
 
 def update_approve(to_address: str, delta_amount: int) -> int:
@@ -137,8 +146,7 @@ def update_approve(to_address: str, delta_amount: int) -> int:
     The approval is incremented of the specified amount. Negative amounts
     decrease the approval.
     """
-    return base.update_approve(allowances, context.sender, to_address,
-                               delta_amount)
+    raise NotImplementedError()
 
 
 def transfer_from(from_address: str, to_address: str, amount: int) -> bool:
@@ -147,17 +155,10 @@ def transfer_from(from_address: str, to_address: str, amount: int) -> bool:
     Operation is only allowed if sender has sufficient allowance on the source
     account.
     """
-    return base.transfer_from(balance_of, allowances, context.sender,
-                              from_address, to_address, amount)
+    raise NotImplementedError()
 
 
 # Catalog management
-
-def _assert_is_bank(address: str):
-    """Raises an exception if provided address is not the bank."""
-    if address != bank_account:
-        raise ValueError("'{} is not the bank".format(address))
-
 
 def get_catalog_size() -> int:
     """Gets the current size of the catalog."""
@@ -203,11 +204,11 @@ def get_total_spent() -> int:
 # Accounts management
 
 def grant(to_address: str, amount: int) -> int:
-    """Gives points to provided customer. Points are created."""
-    global total_supply
+    """Gives points to provided customer. Points are always created."""
     _assert_is_bank(context.sender)
 
-    total_supply = base.mint(balance_of, total_supply, to_address, amount)
+    mint(amount)
+    transfer(to_address, amount)
     return total_supply
 
 

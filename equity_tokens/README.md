@@ -51,9 +51,12 @@ No specific restrictions on transfer.
 ### Allowances conditions
 No specific restrictions on allowances.
 
+One might decide to forbid allowances though, depending
+on the use case (maybe the company does not allow it).
+
 ### Others
 The Shares token introduces another form of allowance called delegation.
-This mechanism is also known as procuration.
+This mechanism is also known as vote by proxy.
 
 Delegation lets shareholders temporarily forward their shareholder rights to
 someone else. Shareholder rights can only be delegated to one person at a time.

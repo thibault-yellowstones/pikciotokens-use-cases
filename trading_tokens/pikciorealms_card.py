@@ -32,8 +32,8 @@ allowances = {}
 """Gives for each customer a map to the amount delegates are allowed to spend 
 on their behalf."""
 
-ruler = ''
-"""Address of the ruler of the game, emitting this token."""
+craftsman = ''
+"""Address of the craftsman of the card, emitting this token."""
 
 # Card characteristics
 # In the magical world of PikcioRealms, characters have
@@ -57,17 +57,17 @@ magic = 0
 
 def init(supply: int, name_: str, symbol_: str):
     """Initialise this token with a new name, symbol and supply."""
-    global total_supply, name, symbol, ruler
+    global total_supply, name, symbol, craftsman
 
     name, symbol = name_, symbol_
     balance_of[context.sender] = total_supply = (supply * 10 ** _decimals)
-    ruler = context.sender
+    craftsman = context.sender
 
 
-def _assert_is_ruler(address: str):
+def _assert_is_craftsman(address: str):
     """Raises an exception if provided address is not the bank."""
-    if address != ruler:
-        raise ValueError("'{} is not the ruler".format(address))
+    if address != craftsman:
+        raise ValueError("'{} is not the craftsman".format(address))
 
 
 def _assert_characteristics_set():
@@ -89,7 +89,7 @@ def init_card(race_: str, element_: str, level_: int, effect_: str,
     All characteristics of the card are set. Please note that this method can
     only be called once. Afterwards the card details are set forever.
     """
-    _assert_is_ruler(context.sender)
+    _assert_is_craftsman(context.sender)
     _assert_characteristics_not_set()
 
     global race, element, level, effect, attack, defense, stamina, magic
@@ -207,7 +207,7 @@ def mint(amount: int) -> int:
     Returns new total supply.
     """
     global total_supply
-    _assert_is_ruler(context.sender)
+    _assert_is_craftsman(context.sender)
     total_supply = base.mint(balance_of, total_supply, context.sender, amount)
     return total_supply
 
@@ -218,7 +218,7 @@ def burn(amount: int) -> int:
     """
     global total_supply
     # A player might decide to destroy a card, if he possesses it, so no:
-    # _assert_is_ruler(context.sender)
+    # _assert_is_craftsman(context.sender)
     total_supply = base.burn(balance_of, total_supply, context.sender, amount)
     return total_supply
 
